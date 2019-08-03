@@ -31,6 +31,7 @@ func createAutocompleter(indexName string) *Autocompleter {
 func TestClient(t *testing.T) {
 
 	c := createClient("testing")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo"))
@@ -72,6 +73,7 @@ func TestClient(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo")).
@@ -86,6 +88,7 @@ func TestInfo(t *testing.T) {
 
 func TestNumeric(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo")).
@@ -135,6 +138,7 @@ func TestNumeric(t *testing.T) {
 
 func TestNoIndex(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 	c.Drop()
 
 	sc := NewSchema(DefaultOptions).
@@ -174,6 +178,7 @@ func TestNoIndex(t *testing.T) {
 
 func TestHighlight(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo")).
@@ -223,6 +228,7 @@ func TestHighlight(t *testing.T) {
 
 func TestSammurize(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo")).
@@ -267,6 +273,7 @@ func TestSammurize(t *testing.T) {
 
 func TestTags(t *testing.T) {
 	c := createClient("myIndex")
+	defer c.Close()
 
 	// Create a schema
 	sc := NewSchema(DefaultOptions).
@@ -350,6 +357,7 @@ func TestSuggest(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	c := createClient("testung")
+	defer c.Close()
 
 	sc := NewSchema(DefaultOptions).
 		AddField(NewTextField("foo"))
@@ -391,6 +399,7 @@ func ExampleClient() {
 	// Create a client. By default a client is schemaless
 	// unless a schema is provided when creating the index
 	c := createClient("myIndex")
+	defer c.Close()
 
 	// Create a schema
 	sc := NewSchema(DefaultOptions).
