@@ -1,6 +1,7 @@
 package redisearch
 
 import (
+	"io"
 	"math/rand"
 	"sync"
 	"time"
@@ -10,13 +11,14 @@ import (
 
 type ConnPool interface {
 	Get() redis.Conn
+	io.Closer
 }
 
-type SingleHostPool struct {
+type singleHostPool struct {
 	*redis.Pool
 }
 
-func NewSingleHostPool(host string) *SingleHostPool {
+func NewSingleHostPool(host string) ConnPool {
 	ret := redis.NewPool(func() (redis.Conn, error) {
 		// TODO: Add timeouts. and 2 separate pools for indexing and querying, with different timeouts
 		return redis.Dial("tcp", host)
@@ -27,24 +29,32 @@ func NewSingleHostPool(host string) *SingleHostPool {
 		}
 		return err
 	}
-	return &SingleHostPool{ret}
+	return &singleHostPool{ret}
 }
 
-type MultiHostPool struct {
+type multiHostPool struct {
 	sync.Mutex
 	pools map[string]*redis.Pool
 	hosts []string
 }
 
-func NewMultiHostPool(hosts []string) *MultiHostPool {
+func (p *multiHostPool) Close() error {
+	p.Lock()
+	defer p.Unlock()
+	for _, pool := range p.pools {
+		pool.Close()
+	}
+	return nil
+}
 
-	return &MultiHostPool{
+func NewMultiHostPool(hosts []string) ConnPool {
+	return &multiHostPool{
 		pools: make(map[string]*redis.Pool, len(hosts)),
 		hosts: hosts,
 	}
 }
 
-func (p *MultiHostPool) Get() redis.Conn {
+func (p *multiHostPool) Get() redis.Conn {
 	p.Lock()
 	defer p.Unlock()
 	host := p.hosts[rand.Intn(len(p.hosts))]

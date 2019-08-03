@@ -43,6 +43,13 @@ type Client struct {
 	name string
 }
 
+func (i *Client) Close() error {
+	if i.pool != nil {
+		i.pool.Close()
+	}
+	return nil
+}
+
 var maxConns = 500
 
 // NewClient creates a new client connecting to the redis host, and using the given name as key prefix.
