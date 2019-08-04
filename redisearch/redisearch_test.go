@@ -300,25 +300,75 @@ func TestTags(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	assertNumResults := func(q string, n int) {
-		// Searching with limit and sorting
-		_, total, err := c.Search(NewQuery(q))
+	assertNumResults := func(qs string, tagFilters []tagFilter, n int) {
+		// Searching with tag filters
+		q := NewQuery(qs)
+		q.tagFilters = tagFilters
+		q.SetFlags(QueryWithScores | QueryWithPayloads)
+		_, total, err := c.Search(q)
 		assert.Nil(t, err)
 
 		assert.Equal(t, n, total)
 	}
 
-	assertNumResults("foo bar", 0)
-	assertNumResults("@tags:{foo bar}", 1)
-	assertNumResults("@tags:{foo\\ bar}", 1)
-	assertNumResults("@tags:{bar}", 0)
-
-	assertNumResults("@tags2:{foo\\ bar\\;bar}", 1)
-	assertNumResults("@tags:{bar\\,baz}", 1)
-	assertNumResults("@tags:{hello world}", 1)
-	assertNumResults("@tags:{hello world} @tags2:{foo\\ bar\\;bar}", 1)
-	assertNumResults("hello world", 1)
-
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"bar"},
+		},
+	}, 0)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"foo bar"},
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"foo bar", "bar"},
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"bar,baz"},
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"hello world"},
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"hello world"},
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"hello world"},
+		},
+		{
+			field:  "tags2",
+			values: []string{"foo bar\\;bar"}, // for the sake of simplicity, disallow tag filters other than comma
+		},
+	}, 1)
+	assertNumResults("", []tagFilter{
+		{
+			field:  "tags",
+			values: []string{"hello world"},
+		},
+		{
+			field:  "tags2",
+			values: []string{"foo bar\\;bar"}, // for the sake of simplicity, disallow tag filters other than comma
+		},
+	}, 1)
+	assertNumResults("foo bar", nil, 0)
+	assertNumResults("hello world", nil, 1)
 }
 
 func TestSuggest(t *testing.T) {
