@@ -1,6 +1,10 @@
 package redisearch
 
-import "github.com/garyburd/redigo/redis"
+import (
+	"fmt"
+	"github.com/garyburd/redigo/redis"
+	"strings"
+)
 
 // Flag is a type for query flags
 type Flag uint64
@@ -52,6 +56,26 @@ type SummaryOptions struct {
 	Separator    string // default "..."
 }
 
+type tagFilter struct {
+	field string
+	// values are OR-ed
+	values []string
+}
+
+func (t tagFilter) serialize() string {
+	// https://oss.redislabs.com/redisearch/Query_Syntax.html#tag_filters
+	var escaped []string
+	for _, v := range t.values {
+		// escape spaces
+		e := strings.ReplaceAll(v, " ", "\\ ")
+		// escape default separator ,
+		e = strings.ReplaceAll(e, ",", "\\,")
+
+		escaped = append(escaped, e)
+	}
+	return fmt.Sprintf("@%s:{%s}", t.field, strings.Join(escaped, "|"))
+}
+
 // Query is a single search query and all its parameters and predicates
 type Query struct {
 	Raw string
@@ -60,6 +84,8 @@ type Query struct {
 	Flags  Flag
 	Slop   int
 
+	// TagFilters are AND-ed
+	tagFilters    []tagFilter
 	Filters       []Predicate
 	InKeys        []string
 	ReturnFields  []string
@@ -89,8 +115,16 @@ func NewQuery(raw string) *Query {
 }
 
 func (q Query) serialize() redis.Args {
-
-	args := redis.Args{q.Raw, "LIMIT", q.Paging.Offset, q.Paging.Num}
+	var raws []string
+	if q.Raw != "" {
+		raws = append(raws, q.Raw)
+	}
+	for _, tf := range q.tagFilters {
+		if tfs := tf.serialize(); tfs != "" {
+			raws = append(raws, tfs)
+		}
+	}
+	args := redis.Args{strings.Join(raws, " "), "LIMIT", q.Paging.Offset, q.Paging.Num}
 	if q.Flags&QueryVerbatim != 0 {
 		args = args.Add("VERBATIM")
 	}
@@ -169,6 +203,15 @@ func (q Query) serialize() redis.Args {
 // 	q.Predicates = append(q.Predicates, p)
 // 	return q
 // }
+
+// AddTagFilter adds a tag filter on the specified tag, filtering the specified values with OR
+func (q *Query) AddTagFilter(tagFieldName string, values []string) *Query {
+	q.tagFilters = append(q.tagFilters, tagFilter{
+		field:  tagFieldName,
+		values: values,
+	})
+	return q
+}
 
 // Limit sets the paging offset and limit for the query
 func (q *Query) Limit(offset, num int) *Query {
