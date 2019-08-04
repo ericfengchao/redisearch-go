@@ -88,6 +88,7 @@ type Query struct {
 	tagFilters    []tagFilter
 	Filters       []Predicate
 	InKeys        []string
+	InFields      []string
 	ReturnFields  []string
 	Language      string
 	Expander      string
@@ -146,6 +147,11 @@ func (q Query) serialize() redis.Args {
 	if q.InKeys != nil {
 		args = args.Add("INKEYS", len(q.InKeys))
 		args = args.AddFlat(q.InKeys)
+	}
+
+	if len(q.InFields) != 0 {
+		args = args.Add("INFIELDS", len(q.InFields))
+		args = args.AddFlat(q.InFields)
 	}
 
 	if q.ReturnFields != nil {
@@ -229,6 +235,12 @@ func (q *Query) SetFlags(flags Flag) *Query {
 // SetInKeys sets the INKEYS argument of the query - limiting the search to a given set of IDs
 func (q *Query) SetInKeys(keys ...string) *Query {
 	q.InKeys = keys
+	return q
+}
+
+// SetInKeys sets the INFIELDS argument of the query - limiting the search to a given set of fields
+func (q *Query) SetInFields(fields ...string) *Query {
+	q.InFields = fields
 	return q
 }
 

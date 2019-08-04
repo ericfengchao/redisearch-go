@@ -371,6 +371,50 @@ func TestTags(t *testing.T) {
 	assertNumResults("hello world", nil, 1)
 }
 
+func TestInFields(t *testing.T) {
+	c := createClient("myIndex")
+	defer c.Close()
+
+	// Create a schema
+	sc := NewSchema(DefaultOptions).
+		AddField(NewTextField("title")).
+		AddField(NewTextField("description")).
+		AddField(NewTextField("keywords"))
+
+	// Drop an existing index. If the index does not exist an error is returned
+	c.Drop()
+
+	// Create the index with the given schema
+	if err := c.CreateIndex(sc); err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a document with an id and given score
+	doc := NewDocument("doc1", 1.0)
+	doc.Set("title", "Hello world").
+		Set("description", "foo bar").
+		Set("keyword", "iphone")
+
+	// Index the document. The API accepts multiple documents at a time
+	if err := c.IndexOptions(DefaultIndexingOptions, doc); err != nil {
+		log.Fatal(err)
+	}
+
+	assertNumResults := func(qs string, fields []string, n int) {
+		// Searching with tag filters
+		q := NewQuery(qs).SetInFields(fields...)
+		q.SetFlags(QueryWithScores | QueryWithPayloads)
+		_, total, err := c.Search(q)
+		assert.Nil(t, err)
+
+		assert.Equal(t, n, total)
+	}
+
+	assertNumResults("hello world", []string{"title"}, 1)
+	assertNumResults("hello world", []string{"description", "keyword"}, 0)
+	assertNumResults("foo bar", []string{"description", "keyword"}, 1)
+}
+
 func TestSuggest(t *testing.T) {
 
 	a := createAutocompleter("testing")
