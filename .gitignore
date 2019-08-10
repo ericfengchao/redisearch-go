@@ -1,5 +1,1 @@
-*
-!/**/
-!**/*.go
-!.gitignore
-!.circleci/config.yml
+.idea/*
