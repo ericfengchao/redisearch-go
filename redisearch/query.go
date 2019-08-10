@@ -3,6 +3,7 @@ package redisearch
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"regexp"
 	"strings"
 )
 
@@ -105,6 +106,14 @@ type Paging struct {
 	Num    int
 }
 
+var re = regexp.MustCompile(`[,\.<>{}\[\]"':;!@#$%\^&*\(\)\-+=~]`)
+
+func escapeString(o string) string {
+	return re.ReplaceAllStringFunc(o, func(match string) string {
+		return "\\" + match
+	})
+}
+
 // NewQuery creates a new query for a given index with the given search term.
 // For currently the index parameter is ignored
 func NewQuery(raw string) *Query {
@@ -123,6 +132,11 @@ func (q Query) serialize() redis.Args {
 	for _, tf := range q.tagFilters {
 		if tfs := tf.serialize(); tfs != "" {
 			raws = append(raws, tfs)
+		}
+	}
+	for _, nf := range q.Filters {
+		if nfs := nf.serialize(); nfs != "" {
+			raws = append(raws, nfs)
 		}
 	}
 	args := redis.Args{strings.Join(raws, " "), "LIMIT", q.Paging.Offset, q.Paging.Num}
@@ -204,11 +218,11 @@ func (q Query) serialize() redis.Args {
 	return args
 }
 
-// // AddPredicate adds a predicate to the query's filters
-// func (q *Query) AddPredicate(p Predicate) *Query {
-// 	q.Predicates = append(q.Predicates, p)
-// 	return q
-// }
+// AddPredicate adds a predicate to the query's filters
+func (q *Query) AddPredicate(p Predicate) *Query {
+	q.Filters = append(q.Filters, p)
+	return q
+}
 
 // AddTagFilter adds a tag filter on the specified tag, filtering the specified values with OR
 func (q *Query) AddTagFilter(tagFieldName string, values []string) *Query {

@@ -1,59 +1,58 @@
 package redisearch
 
-type Operator string
+import "fmt"
 
 const (
-	Eq Operator = "="
-
-	Gt  Operator = ">"
-	Gte Operator = ">="
-
-	Lt  Operator = "<"
-	Lte Operator = "<="
-
-	Between          Operator = "BETWEEN"
-	BetweenInclusive Operator = "BETWEEEN_EXCLUSIVE"
+	negInf = "-inf"
+	posInf = "+inf"
 )
 
 type Predicate struct {
-	Property string
-	Operator Operator
-	Value    []interface{}
+	Property                   string
+	min, max                   interface{}
+	minInclusive, maxInclusive bool
 }
 
-func NewPredicate(property string, operator Operator, values ...interface{}) Predicate {
+func (p Predicate) serialize() string {
+	min := fmt.Sprintf("%v", p.min)
+	if !p.minInclusive {
+		min = fmt.Sprintf("(%v", min)
+	}
+	max := fmt.Sprintf("%v", p.max)
+	if !p.maxInclusive {
+		max = fmt.Sprintf("(%v", max)
+	}
+	return fmt.Sprintf("@%s:[%s %s]", p.Property, min, max)
+}
+
+func InRange(property string, min, max interface{}, minInclusive, maxInclusive bool) Predicate {
 	return Predicate{
-		Property: property,
-		Operator: operator,
-		Value:    values,
+		Property:     property,
+		min:          min,
+		max:          max,
+		minInclusive: minInclusive,
+		maxInclusive: maxInclusive,
 	}
 }
+
 func Equals(property string, value interface{}) Predicate {
-	return NewPredicate(property, Eq, value)
-
-}
-
-func InRange(property string, min, max interface{}, inclusive bool) Predicate {
-	operator := Between
-	if inclusive {
-		operator = BetweenInclusive
-	}
-	return NewPredicate(property, operator, min, max)
+	return InRange(property, value, value, true, true)
 
 }
 
 func LessThan(property string, value interface{}) Predicate {
-	return NewPredicate(property, Lt, value)
+	return InRange(property, negInf, value, true, false)
 }
 
 func LessThanEquals(property string, value interface{}) Predicate {
-	return NewPredicate(property, Lte, value)
+	return InRange(property, negInf, value, true, true)
 }
 
 func GreaterThan(property string, value interface{}) Predicate {
-	return NewPredicate(property, Gt, value)
+	return InRange(property, value, posInf, false, true)
 }
 
 func GreaterThanEquals(property string, value interface{}) Predicate {
-	return NewPredicate(property, Gte, value)
+	return InRange(property, value, posInf, true, true)
+
 }
