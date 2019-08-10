@@ -71,6 +71,41 @@ func TestClient(t *testing.T) {
 	fmt.Println(docs, total, err)
 }
 
+func TestEscaping(t *testing.T) {
+	tests := []string{
+		",",
+		".",
+		"<",
+		">",
+		"{",
+		"}",
+		"[",
+		"]",
+		"\"",
+		"'",
+		":",
+		";",
+		"!",
+		"@",
+		"#",
+		"$",
+		"%",
+		"^",
+		"&",
+		"*",
+		"(",
+		")",
+		"-",
+		"+",
+		"=",
+		"~",
+		"\\",
+	}
+	for _, s := range tests {
+		fmt.Println(escapeString(s))
+	}
+}
+
 func TestInfo(t *testing.T) {
 	c := createClient("testung")
 	defer c.Close()
@@ -413,6 +448,56 @@ func TestInFields(t *testing.T) {
 	assertNumResults("hello world", []string{"title"}, 1)
 	assertNumResults("hello world", []string{"description", "keyword"}, 0)
 	assertNumResults("foo bar", []string{"description", "keyword"}, 1)
+}
+
+func TestNumericFilters(t *testing.T) {
+	c := createClient("myIndex")
+	defer c.Close()
+
+	// Create a schema
+	sc := NewSchema(DefaultOptions).
+		AddField(NewTextField("title")).
+		AddField(NewSortableNumericField("start")).
+		AddField(NewNumericField("end"))
+
+	// Drop an existing index. If the index does not exist an error is returned
+	c.Drop()
+
+	// Create the index with the given schema
+	if err := c.CreateIndex(sc); err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a document with an id and given score
+	doc := NewDocument("doc1", 1.0).
+		Set("title", "foo").
+		Set("start", 1).
+		Set("end", 2)
+
+	// Index the document. The API accepts multiple documents at a time
+	if err := c.IndexOptions(DefaultIndexingOptions, doc); err != nil {
+		log.Fatal(err)
+	}
+
+	assertNumResults := func(predicate Predicate, n int) {
+		// Searching with tag filters
+		q := NewQuery("").AddPredicate(predicate)
+		q.SetFlags(QueryWithScores | QueryWithPayloads)
+		_, total, err := c.Search(q)
+		assert.Nil(t, err)
+
+		assert.Equal(t, n, total)
+	}
+	assertNumResults(InRange("start", 0, 1, false, false), 0)
+	assertNumResults(InRange("start", 0, 1, false, true), 1)
+	assertNumResults(LessThan("start", 1), 0)
+	assertNumResults(LessThanEquals("start", 1), 1)
+	assertNumResults(InRange("end", 2, 3, false, false), 0)
+	assertNumResults(InRange("end", 2, 3, true, false), 1)
+	assertNumResults(GreaterThan("end", 2), 0)
+	assertNumResults(GreaterThanEquals("end", 2), 1)
+	assertNumResults(Equals("start", 1), 1)
+	assertNumResults(Equals("start", 2), 0)
 }
 
 func TestSuggest(t *testing.T) {
