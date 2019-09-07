@@ -215,6 +215,10 @@ func (q Query) serialize() redis.Args {
 			args = args.Add("SEPARATOR", q.SummarizeOpts.Separator)
 		}
 	}
+
+	if q.Language != "" {
+		args = args.Add("LANGUAGE", "chinese")
+	}
 	return args
 }
 

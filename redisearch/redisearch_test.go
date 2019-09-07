@@ -12,7 +12,7 @@ import (
 
 func createClient(indexName string) *Client {
 	value, exists := os.LookupEnv("REDISEARCH_TEST_HOST")
-	host := "localhost:6379"
+	host := "localhost:6378"
 	if exists && value != "" {
 		host = value
 	}
@@ -304,6 +304,101 @@ func TestSammurize(t *testing.T) {
 		assert.Equal(t, "are two sub-[commands] [commands] used for highlighting. One is\r\na [field] into contextual [fragments] surrounding the found terms. It is possible to summarize a [field], highlight a [field], or\r\n", d.Properties["foo"])
 		assert.Equal(t, "hello world foo bar baz", d.Properties["bar"])
 	}
+}
+
+func TestCHNSupport(t *testing.T) {
+	c := createClient("myIndex")
+	defer c.Close()
+
+	// Create a schema
+	sc := NewSchema(DefaultOptions).
+		AddField(NewTextField("title"))
+
+	// Drop an existing index. If the index does not exist an error is returned
+	c.Drop()
+
+	// Create the index with the given schema
+	if err := c.CreateIndex(sc); err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a document with an id and given score
+	doc1 := NewDocument("doc1", 1.0)
+	doc1.Set("title", "very good")
+	doc2 := NewDocument("doc2", 1.0)
+	doc2.Set("title", "旋转拍卖真好用！very good to use!")
+
+	// Index the document. The API accepts multiple documents at a time
+	if err := c.IndexOptions(IndexingOptions{
+		Language: "chinese",
+		Replace:  true,
+	}, doc1, doc2); err != nil {
+		log.Fatal(err)
+	}
+
+	assertNumResults := func(qs string, n int) {
+		// Searching with tag filters
+		q := NewQuery(qs)
+		q.SetFlags(QueryWithScores | QueryWithPayloads)
+		_, total, err := c.Search(q)
+		assert.Nil(t, err)
+
+		assert.Equal(t, n, total)
+	}
+
+	assertNumResults("very good", 2)
+	assertNumResults(`旋转`, 1)
+	assertNumResults("use", 1)
+	assertNumResults(`转拍`, 0) // tho these 2 characters are consecutive in the content, they are belonging to the same token
+	assertNumResults(`拍`, 0)
+}
+
+func TestSimplifiedTraditionalCHNSupport(t *testing.T) {
+	c := createClient("myIndex")
+	defer c.Close()
+
+	// Create a schema
+	sc := NewSchema(DefaultOptions).
+		AddField(NewTextField("title"))
+
+	// Drop an existing index. If the index does not exist an error is returned
+	c.Drop()
+
+	// Create the index with the given schema
+	if err := c.CreateIndex(sc); err != nil {
+		log.Fatal(err)
+	}
+
+	// Create two document with the same sentence in simplified and traditional chinese
+	doc1 := NewDocument("doc1", 1.0)
+	doc1.Set("title", "旋转")
+	doc2 := NewDocument("doc2", 1.0)
+	doc2.Set("title", "旋轉")
+
+	// Index the document. The API accepts multiple documents at a time
+	if err := c.IndexOptions(IndexingOptions{
+		Language: "chinese",
+		Replace:  true,
+	}, doc1, doc2); err != nil {
+		log.Fatal(err)
+	}
+
+	assertNumResults := func(qs string, n int) {
+		// Searching with tag filters
+		q := NewQuery(qs)
+		q.SetFlags(QueryWithScores | QueryWithPayloads)
+		q.SetLanguage("chinese")
+		if s, err := c.Explain(q); err == nil {
+			fmt.Println(s)
+		}
+		_, total, err := c.Search(q)
+		assert.Nil(t, err)
+
+		assert.Equal(t, n, total)
+	}
+
+	// query with same token in both simplified and traditional chinese, expect both docs returned
+	assertNumResults(`牛仔裤`, 1)
 }
 
 func TestTags(t *testing.T) {
