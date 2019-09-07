@@ -112,6 +112,9 @@ func (i *Client) CreateIndex(s *Schema) error {
 					args = append(args, "NOSTEM")
 				}
 
+				if opts.DMENPhonetic {
+					args = append(args, "PHONETIC", "dm:en")
+				}
 				if opts.Sortable {
 					args = append(args, "SORTABLE")
 				}
@@ -119,6 +122,7 @@ func (i *Client) CreateIndex(s *Schema) error {
 				if opts.NoIndex {
 					args = append(args, "NOINDEX")
 				}
+
 			}
 
 		case NumericField:
