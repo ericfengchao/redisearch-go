@@ -27,10 +27,11 @@ type Field struct {
 
 // TextFieldOptions Options for text fields - weight and stemming enabled/disabled.
 type TextFieldOptions struct {
-	Weight   float32
-	Sortable bool
-	NoStem   bool
-	NoIndex  bool
+	Weight       float32
+	Sortable     bool
+	NoStem       bool
+	NoIndex      bool
+	DMENPhonetic bool // phonetic indexing for english with double-metaphone algo
 }
 
 // TagFieldOptions options for indexing tag fields

@@ -613,3 +613,41 @@ func ExampleClient() {
 	fmt.Println(docs[0].Id, docs[0].Properties["title"], total, err)
 	// Output: doc1 Hello world 1 <nil>
 }
+
+func TestPhonetic(t *testing.T) {
+	c := createClient("myIndex")
+	defer c.Close()
+
+	// Create a schema
+	sc := NewSchema(DefaultOptions).
+		AddField(NewTextFieldOptions("name", TextFieldOptions{
+			DMENPhonetic: true,
+		}))
+
+	// Drop an existing index. If the index does not exist an error is returned
+	c.Drop()
+
+	// Create the index with the given schema
+	if err := c.CreateIndex(sc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a document with an id and given score
+	doc1 := NewDocument("doc1", 1.0).Set("name", "john Brian")
+	doc2 := NewDocument("doc2", 1.0).Set("name", "jon bryan")
+
+	if err := c.IndexOptions(DefaultIndexingOptions, doc1, doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	assertNumResults := func(qs string, n int) {
+		q := NewQuery(qs)
+		q.SetFlags(QueryWithScores)
+		_, total, err := c.Search(q)
+		assert.Nil(t, err)
+		assert.Equal(t, n, total)
+	}
+
+	assertNumResults("jon", 2)
+
+}
